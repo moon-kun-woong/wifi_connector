@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="message message-success">
+    인증이 성공적으로 완료되었습니다!
+</div>
+
+<p style="margin: 20px 0;">
+    WiFi 접속이 허용되었습니다.<br>
+    병원 WiFi를 이용해 주셔서 감사합니다.
+</p>
+
+<p style="margin-bottom: 30px; font-size: 0.9em; color: #555;">
+    잠시 후 WiFi가 자동으로 연결됩니다.<br>
+    연결에 문제가 있으신 경우 안내 데스크에 문의해 주세요.
+</p>
+
+<a href="/" class="btn btn-secondary">처음으로</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // WiFi 연결 성공 시 추가 처리를 위한 스크립트
+    // 실제 환경에서는 WiFi 제어 시스템과 연동하는 코드가 필요할 수 있음
+    document.addEventListener('DOMContentLoaded', function() {
+        // 네트워크 상태 확인 또는 필요한 처리
+        console.log('인증 성공, WiFi 연결 준비 완료');
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<p style="margin-bottom: 20px;">
+    WiFi를 이용하시려면 휴대폰 인증이 필요합니다.<br>
+    전화번호를 입력하시면 인증번호가 발송됩니다.
+</p>
+
+<form id="phone-form">
+    <div class="form-group">
+        <label for="phone">전화번호</label>
+        <input type="tel" id="phone" name="phone_number" placeholder="010-1234-5678" required 
+               oninput="validatePhone(this)" maxlength="13">
+    </div>
+    
+    <div id="error-message" class="message message-error" style="display: none;"></div>
+    
+    <button type="submit" class="btn">인증번호 받기</button>
+    <a href="/" class="btn btn-secondary">취소</a>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('phone-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const phone = document.getElementById('phone').value;
+        const errorMsg = document.getElementById('error-message');
+        
+        if (!phone || phone.length < 10) {
+            errorMsg.textContent = '올바른 전화번호를 입력해주세요.';
+            errorMsg.style.display = 'block';
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/auth/send-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ phone_number: phone }),
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // 인증번호 확인 페이지로 이동
+                window.location.href = `/verify?phone_number=${encodeURIComponent(phone)}`;
+            } else {
+                errorMsg.textContent = data.detail || '인증번호 발송에 실패했습니다. 다시 시도해주세요.';
+                errorMsg.style.display = 'block';
+            }
+        } catch (error) {
+            errorMsg.textContent = '오류가 발생했습니다. 다시 시도해주세요.';
+            errorMsg.style.display = 'block';
+            console.error('Error:', error);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - 병원 WiFi 인증</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Sans KR', sans-serif, Arial;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+        }
+        .hospital-logo {
+            width: 80px;
+            height: 80px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 50%;
+            line-height: 80px;
+            font-size: 1.8rem;
+            margin: 0 auto 20px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], input[type="tel"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.3s;
+            width: 100%;
+            margin: 5px 0;
+        }
+        .btn-secondary {
+            background-color: #95a5a6;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .message-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .message-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .timer {
+            font-size: 0.9rem;
+            color: #777;
+            margin-top: 10px;
+        }
+        footer {
+            margin-top: 30px;
+            color: #777;
+            font-size: 0.8rem;
+        }
+    </style>
+    <script>
+        function validatePhone(input) {
+            // 숫자와 하이픈만 허용하는 정규식
+            let value = input.value.replace(/[^0-9-]/g, '');
+            input.value = value;
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="hospital-logo">H</div>
+        <h1>{{ title }}</h1>
+        
+        {% block content %}
+        {% endblock %}
+        
+        <footer>
+            © 2025 병원 WiFi 인증 서비스
+        </footer>
+    </div>
+    
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>
