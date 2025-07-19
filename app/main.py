@@ -8,6 +8,7 @@ from pydantic import ValidationError
 import sqlite3
 from typing import List, Dict, Any, Optional
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -18,7 +19,7 @@ load_dotenv()
 # 테스트/개발 모드 설정
 DEBUG_MODE = os.getenv('DEBUG', 'True').lower() in ('true', 't', '1', 'yes', 'y')
 
-from . import schemas, crud
+from . import schemas, service
 from .database import get_db
 from .sms_service import send_sms
 
@@ -51,7 +52,31 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-file_handler = logging.FileHandler('info.log', 'a', 'utf-8') # "a" 는 append 모드 : 파일이 존재하면 파일 맨 끝에 로그 추가
+# 라인 수 제한을 위한 커스텀 핸들러 설정
+class LineCountingRotatingHandler(RotatingFileHandler):
+    def __init__(self, filename, mode='a', maxLines=1500, backupCount=3, encoding=None):
+        # 평균 로그 라인 길이를 50바이트로 가정하여 초기 크기 설정
+        # 1500줄 * 평균 50바이트 = 75000바이트
+        self.maxLines = maxLines
+        maxBytes = maxLines * 50  # 평균 라인 길이를 50바이트로 가정
+        super().__init__(filename, mode, maxBytes=maxBytes, backupCount=backupCount, encoding=encoding)
+    
+    def shouldRollover(self, record):
+        # 파일이 존재하고 크기가 0보다 크면 라인 수 확인
+        if os.path.exists(self.baseFilename) and os.path.getsize(self.baseFilename) > 0:
+            with open(self.baseFilename, 'r', encoding=self.encoding) as f:
+                line_count = sum(1 for _ in f)
+                if line_count >= self.maxLines:
+                    return 1
+        return super().shouldRollover(record)
+
+file_handler = LineCountingRotatingHandler(
+    'info.log',
+    mode='a',
+    maxLines=1500,  # 최대 1500줄로 제한
+    backupCount=3,  # 최대 3개의 백업 파일 유지
+    encoding='utf-8'
+)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger.addHandler(file_handler)
 
@@ -160,7 +185,7 @@ async def send_auth_code(
     mac_address = request.mac_address
     
     # 인증 코드 생성 및 DB 저장
-    auth_data = crud.create_wifi_auth_request(db, request.phone_number, mac_address)
+    auth_data = service.create_wifi_auth_request(db, request.phone_number, mac_address)
     
     # SMS 메시지 구성
     auth_code = auth_data.get("auth_code")
@@ -200,7 +225,7 @@ async def verify_auth_code(
     db: sqlite3.Connection = Depends(get_db)
 ):
     # 인증 코드 확인
-    is_valid, auth_data = crud.verify_auth_code(db, request.phone_number, request.auth_code, request.mac_address)
+    is_valid, auth_data = service.verify_auth_code(db, request.phone_number, request.auth_code, request.mac_address)
     
     if is_valid:
         return {
@@ -232,7 +257,7 @@ async def check_auth_status(
         )
     
     if phone_number:
-        return crud.check_wifi_auth_status(db, phone_number, mac_address)
+        return service.check_wifi_auth_status(db, phone_number, mac_address)
     
     # MAC 주소로만 조회하는 경우 (추가 구현 필요)
     return {
