@@ -235,9 +235,25 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 ### **일반적인 문제들**
 
 1. **SMS 발송 실패 시**
+   
+   **DEBUG 모드 활성화**
    ```bash
-   # Twilio 설정 확인
+   # .env 파일에서 DEBUG 설정 확인
+   cat .env | grep DEBUG
+   
+   # DEBUG=True인 경우 실제 SMS 발송되지 않음 (로그에만 기록)
+   # 실제 SMS 발송을 위해서는 DEBUG=False로 변경
+   ```
+   
+   **Twilio 설정 확인**
+   ```bash
+   # Twilio 연동 테스트
    python -c "from app.auth.sms_service import send_sms; print(send_sms('01012345678', '123456'))"
+   
+   # 환경변수 확인
+   echo $TWILIO_ACCOUNT_SID
+   echo $TWILIO_AUTH_TOKEN  
+   echo $TWILIO_PHONE_NUMBER
    ```
 
 2. **네트워크 제어 실패 시**
