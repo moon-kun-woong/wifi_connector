@@ -205,37 +205,57 @@ async def send_auth_code(
     request: schemas.PhoneNumberRequest,
     db: sqlite3.Connection = Depends(get_db)
 ):
-    # MAC 주소는 클라이언트 정보에서 추출할 수 있음(옵션)
-    mac_address = request.mac_address
-    
-    # 인증 코드 생성 및 DB 저장
-    auth_data = service.create_wifi_auth_request(db, request.phone_number, mac_address)
-    
-    # SMS 메시지 구성
-    auth_code = auth_data.get("auth_code")
-    message = f"[WiFi 인증] 인증번호 [{auth_code}]를 입력해주세요."
-    
-    # DEBUG_MODE에 따라 SMS 전송 방식 결정
-    if DEBUG_MODE:
-        # 개발/테스트 모드: SMS 전송 생략하고 로그만 기록
-        logger.info(f"[테스트 모드] 인증번호 {auth_code} 가 생성됨 (전화번호: {request.phone_number})")
-        send_result = True
-    else:
-        # 실제 운영 모드: 실제 SMS 발송 시도
-        logger.info(f"[운영 모드] SMS 발송 시도 (전화번호: {request.phone_number})")
-        send_result = send_sms(request.phone_number, message)
-        if not send_result:
-            logger.error(f"SMS 전송 실패: {request.phone_number}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="인증번호 발송에 실패하였습니다. 다시 시도해주세요."
-            )
-    
-    return {
-        "message": "인증번호가 발송되었습니다.",
-        "phone_number": request.phone_number,
-        "expires_in": 180  # 3분 유효
-    }
+    try:
+        logger.info(f"인증 코드 발송 요청 수신: {request.phone_number}")
+        logger.info("단계 1: 요청 수신 완료")
+        
+        # 정리된 전화번호 가져오기
+        clean_phone = request.get_clean_phone_number()
+        logger.info(f"단계 2: 정리된 전화번호: {clean_phone}")
+        
+        # 임시로 간단한 인증 코드 생성
+        import random
+        auth_code = ''.join(random.choices('0123456789', k=6))
+        logger.info(f"단계 3: 인증 코드 생성 완료: {auth_code}")
+        
+        # DEBUG_MODE에 따라 SMS 전송 방식 결정
+        if DEBUG_MODE:
+            # 개발/테스트 모드: SMS 전송 생략하고 로그만 기록
+            logger.info(f"[테스트 모드] 인증번호 {auth_code} 가 생성됨 (전화번호: {request.phone_number})")
+            send_result = True
+        else:
+            # 실제 운영 모드: 실제 SMS 발송 시도
+            logger.info(f"[운영 모드] SMS 발송 시도 (전화번호: {request.phone_number})")
+            message = f"[WiFi 인증] 인증번호 [{auth_code}]를 입력해주세요."
+            send_result = send_sms(request.phone_number, message)
+            if not send_result:
+                logger.error(f"SMS 전송 실패: {request.phone_number}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="인증번호 발송에 실패하였습니다. 다시 시도해주세요."
+                )
+        
+        logger.info("단계 4: 응답 준비 완료")
+        return {
+            "message": "인증번호가 발송되었습니다.",
+            "phone_number": request.phone_number,
+            "expires_in": 180  # 3분 유효
+        }
+        
+    except ValidationError as e:
+        logger.error(f"입력 데이터 검증 오류: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"입력 데이터가 올바르지 않습니다: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"인증 코드 발송 중 오류 발생: {e}")
+        logger.error(f"오류 타입: {type(e).__name__}")
+        logger.error(f"오류 상세: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="인증번호 발송 중 오류가 발생했습니다. 다시 시도해주세요."
+        )
 
 @app.post(
     "/api/auth/verify-code", 

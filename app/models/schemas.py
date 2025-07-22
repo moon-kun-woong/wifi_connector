@@ -41,7 +41,11 @@ class PhoneNumberRequest(BaseModel):
         if not clean_number.startswith('010'):
             raise ValueError('휴대폰 번호는 010으로 시작해야 합니다')
             
-        return clean_number  # 하이픈 제거된 번호 반환
+        return v  # 원래 값 그대로 반환 (검증만 수행)
+    
+    def get_clean_phone_number(self) -> str:
+        """하이픈이 제거된 전화번호 반환"""
+        return self.phone_number.replace('-', '')
 
 
 class AuthCodeRequest(BaseModel):
