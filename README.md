@@ -234,19 +234,19 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 
 ### **일반적인 문제들**
 
-1. **SMS 발송 실패**
+1. **SMS 발송 실패 시**
    ```bash
    # Twilio 설정 확인
    python -c "from app.auth.sms_service import send_sms; print(send_sms('01012345678', '123456'))"
    ```
 
-2. **네트워크 제어 실패**
+2. **네트워크 제어 실패 시**
    ```bash
    # iptables 권한 확인
    sudo iptables -L WIFI_CAPTIVE
    ```
 
-3. **데이터베이스 오류**
+3. **데이터베이스 오류 시**
    ```bash
    # 데이터베이스 재초기화
    rm app.db
