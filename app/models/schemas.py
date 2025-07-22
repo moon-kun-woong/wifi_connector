@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List
 import re
+from typing import Optional, List
+
+from pydantic import BaseModel, Field, validator
 
 
 class HTTPError(BaseModel):
@@ -81,3 +82,30 @@ class VerifyAuthResponse(BaseModel):
     message: str
     is_authenticated: bool
     phone_number: str
+    network_access_granted: Optional[bool] = Field(None, description="네트워크 접근 허용 여부")
+
+
+# 네트워크 제어 관련 스키마
+class NetworkAccessRequest(BaseModel):
+    phone_number: str = Field(..., description="사용자 전화번호")
+    mac_address: str = Field(..., description="기기 MAC 주소")
+    ip_address: Optional[str] = Field(None, description="클라이언트 IP 주소")
+
+
+class NetworkAccessResponse(BaseModel):
+    message: str
+    phone_number: str
+    mac_address: str
+    access_revoked: bool
+
+
+class NetworkStatusResponse(BaseModel):
+    ip_address: str
+    mac_address: str
+    network_access_allowed: bool
+    message: str
+
+
+class SessionCleanupResponse(BaseModel):
+    message: str
+    cleaned_sessions: int

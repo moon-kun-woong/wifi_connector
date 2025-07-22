@@ -1,41 +1,18 @@
-"""
-SMS 메시지 전송을 위한 모듈 - Twilio API 및 이메일 SMS 게이트웨이 활용
-"""
 import logging
 import os
-import smtplib
-from email.mime.text import MIMEText
 from dotenv import load_dotenv
-from typing import Dict, Optional
+from typing import Optional
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 
-# .env 파일에서 환경 변수 값을 로드
 load_dotenv()
 
-# 이메일 SMTP 설정 불러오기
-SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
-SMTP_USERNAME = os.getenv('SMTP_USERNAME', '')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
-
-# 통신사 SMS 게이트웨이 정보
-CARRIER_MAP = {
-    'skt': '@sms.skt.com',      # SKT
-    'kt': '@lms.kt.com',        # KT
-    'lgu': '@lms.uplus.co.kr',  # LG U+
-    'skt_mms': '@mms.skt.com',  # SKT MMS
-    'kt_mms': '@mms.kt.com',    # KT MMS
-    'lgu_mms': '@mms.uplus.co.kr'  # LG U+ MMS
-}
-
-# 기본 통신사 설정
-DEFAULT_CARRIER = os.getenv('DEFAULT_CARRIER', 'skt')
-
-# Twilio 설정
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
 TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '')
+
+# 테스트/개발 모드 설정
+DEBUG_MODE = os.getenv('DEBUG', 'True').lower() in ('true', 't', '1', 'yes', 'y')
 
 # Twilio 클라이언트 초기화
 twilio_client = None
@@ -45,37 +22,30 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
         logging.info("Twilio 클라이언트가 초기화되었습니다.")
     except Exception as e:
         logging.error(f"Twilio 클라이언트 초기화 실패: {e}")
+        twilio_client = None
 
 logger = logging.getLogger(__name__)
 
-def detect_carrier(phone_number: str) -> str:
+def format_phone_number(phone_number: str) -> str:
     """
-    전화번호 앞자리를 기준으로 통신사를 추측합니다.
-    정확한 통신사 구분이 필요한 경우 사용자에게 직접 확인해야 합니다.
+    전화번호를 국제 형식(+82)으로 변환합니다.
     
     Args:
-        phone_number: 전화번호 (010-xxxx-xxxx 형식)
+        phone_number: 전화번호 (010-xxxx-xxxx 또는 01xxxxxxxx 형식)
         
     Returns:
-        str: 통신사 코드 ('skt', 'kt', 'lgu' 중 하나)
+        str: 국제 형식 전화번호 (+82xxxxxxxxx)
     """
-    # 전화번호에서 하이픈 제거
-    clean_number = phone_number.replace('-', '')
+    # 전화번호에서 하이픈과 공백 제거
+    clean_number = phone_number.replace('-', '').replace(' ', '')
     
-    # 앞 3자리는 무조건 010이므로 그 다음 번호를 확인
-    if len(clean_number) >= 4:
-        fourth_digit = clean_number[3]
-        
-        # 통신사별 번호 할당 범위에 따른 추측 (100% 정확하지 않음)
-        if fourth_digit in ['1', '6', '9']:
-            return 'skt'
-        elif fourth_digit in ['2', '4', '7', '8']:
-            return 'kt'
-        elif fourth_digit in ['3', '5']:
-            return 'lgu'
-    
-    # 판단할 수 없는 경우 기본값 반환
-    return DEFAULT_CARRIER
+    # 010으로 시작하는 경우 +82로 변환
+    if clean_number.startswith('0'):
+        return '+82' + clean_number[1:]
+    elif clean_number.startswith('+82'):
+        return clean_number  # 이미 국제 형식
+    else:
+        return '+82' + clean_number  # 기타 경우
 
 def send_sms_via_email_gateway(phone_number: str, message: str, carrier: Optional[str] = None) -> bool:
     """

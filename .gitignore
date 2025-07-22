@@ -1,13 +1,16 @@
-app/__pycache__/*
+# Python 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 데이터베이스 파일
 app.db
-app/__pycache__/main.cpython-38.pyc
-app/__pycache__/service.cpython-38.pyc
-app/__pycache__/database.cpython-38.pyc
-app/__pycache__/models.cpython-38.pyc
-app/__pycache__/schemas.cpython-38.pyc
+app.db.bak
 app/tests/*
 app/tests/test_api.py
 app.log
-app.db.bak
 .env
 venv
+info.log
+info.log1

@@ -1,27 +1,29 @@
+import logging
+import os
+import sqlite3
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, status, Response, Request, Form
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
-import sqlite3
-from typing import List, Dict, Any, Optional
-import logging
-from logging.handlers import RotatingFileHandler
-import os
-from pathlib import Path
-from dotenv import load_dotenv
 
-# .env 파일 로드
+from .auth import service
+from .auth.sms_service import send_sms
+from .models import schemas
+from .models.database import get_db, init_db
+from .network.network_control import NetworkControlService
+
 load_dotenv()
 
 # 테스트/개발 모드 설정
 DEBUG_MODE = os.getenv('DEBUG', 'True').lower() in ('true', 't', '1', 'yes', 'y')
-
-from . import schemas, service
-from .database import get_db
-from .sms_service import send_sms
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -48,6 +50,28 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Jinja2 템플릿 설정
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# 네트워크 제어 서비스 설정
+network_config = {
+    'type': os.getenv('NETWORK_CONTROLLER_TYPE', 'iptables'),
+    'interface': os.getenv('NETWORK_INTERFACE', 'wlan0'),
+    'captive_portal_ip': os.getenv('CAPTIVE_PORTAL_IP', '192.168.1.1'),
+    'captive_portal_port': os.getenv('CAPTIVE_PORTAL_PORT', '8000'),
+    'chain_name': 'WIFI_CAPTIVE',
+    # pfSense 설정
+    'api_url': os.getenv('PFSENSE_API_URL'),
+    'api_key': os.getenv('PFSENSE_API_KEY'),
+    'api_secret': os.getenv('PFSENSE_API_SECRET'),
+    # RADIUS 설정
+    'radius_server': os.getenv('RADIUS_SERVER', 'localhost'),
+    'radius_port': int(os.getenv('RADIUS_PORT', '1812')),
+    'radius_secret': os.getenv('RADIUS_SECRET', 'testing123'),
+    'nas_identifier': os.getenv('RADIUS_NAS_IDENTIFIER', 'wifi-captive-portal')
+}
+
+# 전역 네트워크 제어 서비스 (의존성 주입에서 사용)
+def get_network_service(db: sqlite3.Connection = Depends(get_db)) -> NetworkControlService:
+    return NetworkControlService(db, network_config)
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -222,17 +246,49 @@ async def send_auth_code(
 )
 async def verify_auth_code(
     request: schemas.AuthCodeRequest,
-    db: sqlite3.Connection = Depends(get_db)
+    db: sqlite3.Connection = Depends(get_db),
+    network_service: NetworkControlService = Depends(get_network_service)
 ):
     # 인증 코드 확인
     is_valid, auth_data = service.verify_auth_code(db, request.phone_number, request.auth_code, request.mac_address)
     
     if is_valid:
-        return {
-            "message": "WiFi 인증이 완료되었습니다.",
-            "is_authenticated": True,
-            "phone_number": request.phone_number
-        }
+        # 네트워크 접근 허용
+        try:
+            # 클라이언트 IP 주소 가져오기 (실제 환경에서는 request에서 추출)
+            client_ip = request.ip_address if hasattr(request, 'ip_address') else "192.168.1.100"
+            
+            # 네트워크 제어를 통해 실제 인터넷 접근 허용
+            network_allowed = network_service.authenticate_and_allow_device(
+                auth_data['wifi_auth_id'], 
+                client_ip, 
+                request.mac_address
+            )
+            
+            if network_allowed:
+                logger.info(f"네트워크 접근 허용 완료: {request.phone_number} ({request.mac_address})")
+                return {
+                    "message": "WiFi 인증이 완료되었습니다. 인터넷을 사용하실 수 있습니다.",
+                    "is_authenticated": True,
+                    "phone_number": request.phone_number,
+                    "network_access_granted": True
+                }
+            else:
+                logger.error(f"네트워크 접근 허용 실패: {request.phone_number} ({request.mac_address})")
+                return {
+                    "message": "인증은 완료되었으나 네트워크 접근 설정에 실패했습니다. 관리자에게 문의하세요.",
+                    "is_authenticated": True,
+                    "phone_number": request.phone_number,
+                    "network_access_granted": False
+                }
+        except Exception as e:
+            logger.error(f"네트워크 제어 오류: {e}")
+            return {
+                "message": "인증은 완료되었으나 네트워크 설정 중 오류가 발생했습니다.",
+                "is_authenticated": True,
+                "phone_number": request.phone_number,
+                "network_access_granted": False
+            }
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -264,3 +320,137 @@ async def check_auth_status(
         "is_authenticated": False,
         "message": "MAC 주소로만 조회하는 기능은 현재 구현 중입니다."
     }
+
+# ===== 네트워크 제어 관리 엔드포인트 =====
+
+@app.post(
+    "/api/network/revoke-access",
+    tags=["네트워크 제어"],
+    summary="네트워크 접근 취소",
+    description="특정 사용자의 네트워크 접근을 취소합니다."
+)
+async def revoke_network_access(
+    phone_number: str,
+    mac_address: str,
+    db: sqlite3.Connection = Depends(get_db),
+    network_service: NetworkControlService = Depends(get_network_service)
+):
+    """사용자의 네트워크 접근을 취소합니다."""
+    try:
+        # WiFi 인증 정보 조회
+        auth_info = service.check_wifi_auth_status(db, phone_number, mac_address)
+        
+        if not auth_info.get('is_authenticated'):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="인증되지 않은 사용자입니다."
+            )
+        
+        # 네트워크 접근 취소
+        client_ip = "192.168.1.100"  # 실제 환경에서는 세션에서 가져와야 함
+        revoked = network_service.revoke_device_access(
+            auth_info['wifi_auth_id'],
+            client_ip,
+            mac_address
+        )
+        
+        if revoked:
+            return {
+                "message": f"사용자 {phone_number}의 네트워크 접근이 취소되었습니다.",
+                "phone_number": phone_number,
+                "mac_address": mac_address,
+                "access_revoked": True
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="네트워크 접근 취소에 실패했습니다."
+            )
+            
+    except Exception as e:
+        logger.error(f"네트워크 접근 취소 오류: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="네트워크 접근 취소 중 오류가 발생했습니다."
+        )
+
+@app.post(
+    "/api/network/cleanup-sessions",
+    tags=["네트워크 제어"],
+    summary="만료된 세션 정리",
+    description="만료된 네트워크 세션들을 정리합니다."
+)
+async def cleanup_expired_sessions(
+    network_service: NetworkControlService = Depends(get_network_service)
+):
+    """만료된 세션들을 정리합니다."""
+    try:
+        cleaned_count = network_service.cleanup_expired_sessions()
+        return {
+            "message": f"만료된 세션 {cleaned_count}개가 정리되었습니다.",
+            "cleaned_sessions": cleaned_count
+        }
+    except Exception as e:
+        logger.error(f"세션 정리 오류: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="세션 정리 중 오류가 발생했습니다."
+        )
+
+@app.get(
+    "/api/network/check-access",
+    tags=["네트워크 제어"],
+    summary="네트워크 접근 상태 확인",
+    description="디바이스의 실제 네트워크 접근 상태를 확인합니다."
+)
+async def check_network_access(
+    ip_address: str,
+    mac_address: str,
+    network_service: NetworkControlService = Depends(get_network_service)
+):
+    """디바이스의 네트워크 접근 상태를 확인합니다."""
+    try:
+        is_allowed = network_service.check_device_access(ip_address, mac_address)
+        return {
+            "ip_address": ip_address,
+            "mac_address": mac_address,
+            "network_access_allowed": is_allowed,
+            "message": "네트워크 접근이 허용됨" if is_allowed else "네트워크 접근이 차단됨"
+        }
+    except Exception as e:
+        logger.error(f"네트워크 접근 상태 확인 오류: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="네트워크 접근 상태 확인 중 오류가 발생했습니다."
+        )
+
+# ===== 앱 시작 시 초기화 =====
+
+@app.on_event("startup")
+async def startup_event():
+    """앱 시작 시 초기화 작업을 수행합니다."""
+    logger.info("WiFi 캡티브 포털 서비스 시작")
+    
+    # 데이터베이스 초기화
+    init_db()
+    
+    # 네트워크 제어 설정 로그
+    logger.info(f"네트워크 제어 타입: {network_config['type']}")
+    logger.info(f"네트워크 인터페이스: {network_config['interface']}")
+    logger.info(f"캡티브 포털 IP: {network_config['captive_portal_ip']}:{network_config['captive_portal_port']}")
+    
+    # 관리자 계정 확인
+    try:
+        from .admin.admin_service import ensure_default_admin
+        db = sqlite3.connect(os.getenv('DB_FILE', 'app.db'))
+        db.row_factory = sqlite3.Row
+        ensure_default_admin(db)
+        db.close()
+        logger.info("기본 관리자 계정 확인 완료")
+    except Exception as e:
+        logger.error(f"관리자 계정 초기화 오류: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """앱 종료 시 정리 작업을 수행합니다."""
+    logger.info("WiFi 캡티브 포털 서비스 종료")
