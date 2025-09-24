@@ -1,27 +1,27 @@
-# 🏥 WiFi 캡티브 포털 서비스
+# WiFi 캡티브 포털 서비스
 
 **병원용 완전한 캡티브 포털 시스템**
 
 Python FastAPI 기반의 실제 네트워크 접근 제어가 가능한 WiFi 캡티브 포털입니다. SMS 인증을 통해 사용자를 인증하고, 라우터/방화벽과 연동하여 실제 인터넷 접근을 제어합니다.
 
-## ✨ 주요 기능
+## 주요 기능
 
-### 🔐 **완전한 캡티브 포털**
+### **완전한 캡티브 포털**
 - **실제 네트워크 접근 제어** - iptables, pfSense, RADIUS 연동
 - **DNS 리다이렉션** - 인증되지 않은 사용자를 캡티브 포털로 리다이렉트
 - **MAC 주소 기반 세션 관리** - 디바이스별 접근 제어
 
-### 📱 **SMS 인증 시스템**
+### **SMS 인증 시스템**
 - **Twilio API 연동** - 안정적인 SMS 발송
 - **6자리 인증 코드** - 3분 만료 시간
 - **전화번호 검증** - 한국 휴대폰 번호 형식 검증
 
-### ⏰ **세션 관리**
+### **세션 관리**
 - **1일 자동 만료** - 인증 후 24시간 접속 유지
 - **자동 재인증** - 만료된 세션 자동 정리
 - **실시간 모니터링** - 활성 사용자 및 세션 추적
 
-### 👨‍💼 **관리자 기능**
+### **관리자 기능**
 - **사용자 관리** - 특정 번호/디바이스 차단/허용
 - **접근 로그** - 상세한 인증 및 접근 기록
 - **통계 대시보드** - 사용 현황 및 통계 조회
@@ -44,35 +44,35 @@ Python FastAPI 기반의 실제 네트워크 접근 제어가 가능한 WiFi 캡
 - **Twilio API** - SMS 발송 서비스
 - **Jinja2** - HTML 템플릿 엔진
 
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 wifi_connector/
 ├── app/
-│   ├── auth/                    # 🔐 인증 관련 모듈
+│   ├── auth/                    # 인증 관련 모듈
 │   │   ├── service.py          # WiFi 인증 로직
 │   │   └── sms_service.py      # SMS 발송 서비스
-│   ├── network/                 # 🌐 네트워크 제어 모듈
+│   ├── network/                 # 네트워크 제어 모듈
 │   │   ├── network_control.py  # 실제 네트워크 제어
 │   │   └── network_service.py  # 세션 관리
-│   ├── admin/                   # 👨‍💼 관리자 기능
+│   ├── admin/                   # 관리자 기능
 │   │   └── admin_service.py    # 관리자 인증/관리
-│   ├── models/                  # 📊 데이터베이스 모델
+│   ├── models/                  # 데이터베이스 모델
 │   │   ├── database.py         # DB 연결/초기화
 │   │   └── schemas.py          # Pydantic 스키마
-│   ├── core/                    # ⚙️ 핵심 설정
-│   ├── api/                     # 🔌 API 라우터
-│   ├── utils/                   # 🛠 유틸리티
-│   └── main.py                  # 🚀 FastAPI 메인 앱
-├── static/                      # 📁 정적 파일
-├── templates/                   # 📄 HTML 템플릿
-├── tests/                       # 🧪 테스트 파일
-├── .env                         # 🔒 환경 변수
-├── requirements.txt             # 📦 의존성
-└── README.md                    # 📖 프로젝트 문서
+│   ├── core/                    # 핵심 설정
+│   ├── api/                     # API 라우터
+│   ├── utils/                   # 유틸리티
+│   └── main.py                  # FastAPI 메인 앱
+├── static/                      # 정적 파일
+├── templates/                   # HTML 템플릿
+├── tests/                       # 테스트 파일
+├── .env                         # 환경 변수
+├── requirements.txt             # 의존성
+└── README.md                    # 프로젝트 문서
 ```
 
-## 🚀 설치 및 실행
+## 설치 및 실행
 
 ### 1. **의존성 설치**
 
@@ -126,7 +126,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - **API 문서**: http://localhost:8000/docs
 - **인증 페이지**: http://localhost:8000/auth
 
-## 🔌 API 엔드포인트
+## API 엔드포인트
 
 ### **웹 페이지**
 - `GET /` - 메인 랜딩 페이지
@@ -144,7 +144,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - `POST /api/network/cleanup-sessions` - 만료된 세션 정리
 - `GET /api/network/check-access` - 네트워크 접근 상태 확인
 
-## 🌐 네트워크 제어 설정
+## 네트워크 제어 설정
 
 ### **Linux (iptables) 환경**
 ```bash
@@ -175,7 +175,7 @@ RADIUS_SECRET=your_radius_secret
 RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 ```
 
-## 📊 데이터베이스 스키마
+## 데이터베이스 스키마
 
 ### **주요 테이블**
 - `wifi_auth` - WiFi 인증 정보
@@ -186,7 +186,7 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 - `admin_users` - 관리자 계정
 - `system_logs` - 시스템 로그
 
-## 🔧 운영 환경 배포
+## 운영 환경 배포
 
 ### **병원 서버 배포 시 고려사항**
 
@@ -212,7 +212,7 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 - **디스크**: 최소 10GB 여유 공간
 - **네트워크**: 관리자 권한 (iptables 사용 시)
 
-## 📝 로깅 시스템
+## 로깅 시스템
 
 ### **로그 레벨**
 - `INFO` - 일반적인 시스템 동작
@@ -230,7 +230,7 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 - `ADMIN` - 관리자 활동 로그
 - `SMS` - SMS 발송 로그
 
-## 🚨 문제 해결
+## 문제 해결
 
 ### **일반적인 문제들**
 
@@ -269,7 +269,7 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
    python -c "from app.models.database import init_db; init_db()"
    ```
 
-## 🤝 기여하기
+## 기여하기
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -277,14 +277,14 @@ RADIUS_NAS_IDENTIFIER=wifi-captive-portal
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 라이선스
+## 라이선스
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📞 지원
+## 지원
 
 문제가 발생하거나 질문이 있으시면 이슈를 생성해주세요.
 
 ---
 
-**🏥 병원 WiFi 환경을 위한 완전한 캡티브 포털 솔루션** 🚀
+**병원 WiFi 환경을 위한 완전한 캡티브 포털 솔루션** 🚀
